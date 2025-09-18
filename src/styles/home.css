@@ -1,0 +1,30 @@
+/* Styles responsive pour le tableau des commandes d'aujourd'hui */
+.today-orders-container {
+  /* Sur les grands écrans (desktop) : à gauche, max 50% de largeur */
+  width: 50%;
+  max-width: 50%;
+}
+
+/* Tablettes (768px et moins) */
+@media (max-width: 768px) {
+  .today-orders-container {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Mobiles (480px et moins) */
+@media (max-width: 480px) {
+  .today-orders-container {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Pour les écrans moyens (tablettes en landscape) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .today-orders-container {
+    width: 70%;
+    max-width: 70%;
+  }
+}
