@@ -45,7 +45,7 @@ const ClaimManagementPage = () => {
   const [isNarrow, setIsNarrow] = useState<boolean>(false);
 
   // Cloudflare URL
-  const cloudflareUrl = "https://prod.plumservices.co";
+  const cloudflareUrl = (import.meta as any).env?.VITE_SUPABASE_STORAGE_URL_FOR_IMAGES;
 
   // Utilisation du hook de filtrage
   const {
