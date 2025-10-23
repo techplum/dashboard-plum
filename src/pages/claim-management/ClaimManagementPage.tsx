@@ -66,7 +66,7 @@ const ClaimManagementPage = () => {
       await Talk.ready;
       const user = new Talk.User({
         id: currentAdminId,
-        name: "Equipe Plüm",
+        name: "Equipe SupportPlüm",
         email: "contact@plumservices.fr",
         role: "admin",
       });
