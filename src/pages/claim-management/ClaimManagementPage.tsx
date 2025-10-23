@@ -195,8 +195,8 @@ const ClaimManagementPage = () => {
   const syncUserFn = () => {
     return new Talk.User({
       id: currentAdminId,
-      name: "Admin Support",
-      email: "admin@example.com",
+      name: "Équipe Support Plüm",
+      email: "tech@plumservices.co",
       role: "admin",
     });
   };
