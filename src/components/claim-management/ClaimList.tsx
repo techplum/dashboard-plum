@@ -85,7 +85,6 @@ export const ClaimList: React.FC<ClaimListProps> = ({
   cloudflareUrl,
 }) => {
   const { mode } = useContext(ColorModeContext);
-
   return (
     <div
       className="claims-list"

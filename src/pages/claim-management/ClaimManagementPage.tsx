@@ -45,7 +45,7 @@ const ClaimManagementPage = () => {
   const [isNarrow, setIsNarrow] = useState<boolean>(false);
 
   // Cloudflare URL
-  const cloudflareUrl = "https://plüm.re";
+  const cloudflareUrl = (import.meta as any).env?.VITE_SUPABASE_STORAGE_URL_FOR_IMAGES;
 
   // Utilisation du hook de filtrage
   const {
@@ -66,7 +66,7 @@ const ClaimManagementPage = () => {
       await Talk.ready;
       const user = new Talk.User({
         id: currentAdminId,
-        name: "Equipe Plüm",
+        name: "Equipe SupportPlüm",
         email: "contact@plumservices.fr",
         role: "admin",
       });
@@ -195,8 +195,8 @@ const ClaimManagementPage = () => {
   const syncUserFn = () => {
     return new Talk.User({
       id: currentAdminId,
-      name: "Admin Support",
-      email: "admin@example.com",
+      name: "Équipe Support Plüm",
+      email: "tech@plumservices.co",
       role: "admin",
     });
   };
