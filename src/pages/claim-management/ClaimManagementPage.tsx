@@ -45,7 +45,7 @@ const ClaimManagementPage = () => {
   const [isNarrow, setIsNarrow] = useState<boolean>(false);
 
   // Cloudflare URL
-  const cloudflareUrl = "https://plüm.re";
+  const cloudflareUrl = "https://prod.plumservices.co";
 
   // Utilisation du hook de filtrage
   const {
