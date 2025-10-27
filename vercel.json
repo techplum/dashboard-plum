@@ -8,6 +8,10 @@
     {
       "source": "/api/admin-images/(.*)",
       "destination": "/api/admin-images"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
