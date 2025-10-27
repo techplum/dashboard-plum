@@ -1,13 +1,13 @@
 {
   "functions": {
-    "public/image-proxy.js": {
+    "api/admin-images.js": {
       "maxDuration": 30
     }
   },
   "rewrites": [
     {
       "source": "/api/admin-images/(.*)",
-      "destination": "/image-proxy.js"
+      "destination": "/api/admin-images"
     }
   ],
   "headers": [
