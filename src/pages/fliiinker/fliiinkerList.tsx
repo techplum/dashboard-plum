@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { List } from '@refinedev/antd';
-import { Drawer, Spin, TablePaginationConfig, message } from 'antd';
+import { TablePaginationConfig, message } from 'antd';
 import '../../styles/FliiinkerList.css';
-import { FliiinkerTable } from '../../components/fliiinker/fliiinkerList';
-import { FliiinkerDetails } from '../../components/fliiinker/fliiinkerDetails';
+import { FliiinkerTable, FliiinkerDetailsModal } from '../../components/fliiinker';
 import { fetchPaginatedFliiinkers } from '../../services/fliiinker/fliiinkerApi';
 import { Public_profile } from '../../types/public_profileTypes';
 
@@ -16,7 +15,7 @@ export const FliiinkerLists: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fliiinkers, setFliiinkers] = useState<Public_profile[]>([]);
   const [selectedFliiinker, setSelectedFliiinker] = useState<Public_profile | null>(null);
-  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const loadFliiinkers = useCallback(async (page: number, size: number) => {
     setLoading(true);
@@ -50,7 +49,16 @@ export const FliiinkerLists: React.FC = () => {
 
   const handleViewFliiinker = (fliiinker: Public_profile) => {
     setSelectedFliiinker(fliiinker);
-    setIsDrawerVisible(true);
+    setIsModalVisible(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalVisible(false);
+    setSelectedFliiinker(null);
+  };
+
+  const handleDeleteFliiinker = () => {
+    loadFliiinkers(currentPage, pageSize);
   };
 
   return (
@@ -75,21 +83,12 @@ export const FliiinkerLists: React.FC = () => {
         />
       </List>
 
-      <Drawer
-        title="Détails du Fliiinker"
-        placement="right"
-        width={500}
-        onClose={() => setIsDrawerVisible(false)}
-        open={isDrawerVisible}
-      >
-        {selectedFliiinker && (
-          <FliiinkerDetails
-            publicProfile={selectedFliiinker}
-            fliiinkerProfile={selectedFliiinker.fliiinker_profile || null}
-            onClose={() => setIsDrawerVisible(false)}
-          />
-        )}
-      </Drawer>
+      <FliiinkerDetailsModal
+        isVisible={isModalVisible}
+        fliiinker={selectedFliiinker}
+        onClose={handleCloseModal}
+        onDelete={handleDeleteFliiinker}
+      />
     </>
   );
 };

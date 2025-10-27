@@ -137,4 +137,44 @@
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.1);
+}
+
+.contact-item {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: all 0.2s ease;
+}
+
+.contact-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.superpower-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(114, 46, 209, 0.1), rgba(24, 144, 255, 0.1));
+  border: 1px solid rgba(114, 46, 209, 0.2);
+  color: #722ed1;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 2px;
+}
+
+.price-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.1), rgba(82, 196, 26, 0.05));
+  border: 1px solid rgba(82, 196, 26, 0.2);
+  color: #52c41a;
+  font-weight: 600;
 } 
