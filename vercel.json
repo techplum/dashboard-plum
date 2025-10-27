@@ -1,0 +1,32 @@
+{
+  "functions": {
+    "public/image-proxy.js": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/admin-images/(.*)",
+      "destination": "/image-proxy.js"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/admin-images/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, access-administrative-image"
+        }
+      ]
+    }
+  ]
+}
