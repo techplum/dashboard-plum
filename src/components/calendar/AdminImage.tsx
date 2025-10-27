@@ -32,6 +32,8 @@ export const AdminImage: React.FC<AdminImageProps> = ({ imagePath, alt, style, o
         console.log("🔍 Token:", import.meta.env.VITE_ACCESS_ADMINISTRATIVE_IMAGE_SECRET_KEY ? "✅ Défini" : "❌ Non défini");
         
         const signedUrl = await getSignedImageUrl(imagePath);
+        console.log("🔍 AdminImage - URL reçue:", signedUrl ? signedUrl.substring(0, 100) + "..." : "null");
+        console.log("🔍 AdminImage - URL valide:", signedUrl && signedUrl !== "URL_FACTICE" ? "✅ Oui" : "❌ Non");
         setImageUrl(signedUrl);
         setLoading(false);
 

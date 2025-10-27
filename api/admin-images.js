@@ -47,12 +47,14 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('📋 Données reçues:', typeof data, data ? Object.keys(data) : 'null');
 
-    // Si on reçoit une URL signée, rediriger vers cette URL
-    if (data && data.signedUrl) {
-      return res.redirect(302, data.signedUrl);
+    // Retourner directement la réponse JSON du backend
+    // Le frontend s'attend à recevoir { data: { signedUrl: "..." } } ou { signedUrl: "..." }
+    if (data && (data.signedUrl || data.data?.signedUrl)) {
+      console.log('✅ URL signée trouvée, retour JSON');
+      return res.json(data);
     }
 
-    // Si on reçoit directement l'image (buffer)
+    // Si on reçoit directement l'image (buffer) - cas non utilisé normalement
     if (data && typeof data === 'object' && data.buffer) {
       res.setHeader('Content-Type', 'image/png');
       res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -60,9 +62,11 @@ export default async function handler(req, res) {
     }
 
     // Fallback - retourner l'erreur
+    console.log('❌ Format de réponse non reconnu:', data);
     return res.status(500).json({ 
       error: 'Invalid response format', 
-      received: typeof data 
+      received: typeof data,
+      data: data
     });
 
   } catch (error) {
