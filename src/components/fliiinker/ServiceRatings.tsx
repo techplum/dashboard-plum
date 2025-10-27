@@ -87,7 +87,7 @@ export const ServiceRatings: React.FC<ServiceRatingsProps> = ({ services, fliiin
       if (error && (error.code === "42501" || error.code === "PGRST116" || error.message?.includes("permission") || error.message?.includes("insufficient"))) {
         console.log("⚠️ Erreur d'autorisation détectée:", error.code, error.message);
         console.log("⚠️ Tentative avec service role client");
-        const result = await supabaseServiceRole
+        const result = await serviceRoleClient
           .from("fliiinker_service_rating")
           .select(`
             *,
@@ -224,7 +224,7 @@ export const ServiceRatings: React.FC<ServiceRatingsProps> = ({ services, fliiin
                 <Title level={5} style={{ margin: 0, opacity: isActiveService ? 1 : 0.7 }}>
                   {getServiceTypeName(serviceId)}
                   {!isActiveService && (
-                    <Tag size="small" color="orange" style={{ marginLeft: 8 }}>
+                    <Tag color="orange" style={{ marginLeft: 8 }}>
                       Service inactif
                     </Tag>
                   )}
@@ -291,7 +291,7 @@ export const ServiceRatings: React.FC<ServiceRatingsProps> = ({ services, fliiin
                       )}
                       
                       {rating.order_id && (
-                        <Tag size="small" color="blue" style={{ marginTop: 8 }}>
+                        <Tag color="blue" style={{ marginTop: 8 }}>
                           Commande #{rating.order_id}
                         </Tag>
                       )}

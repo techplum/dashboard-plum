@@ -128,7 +128,7 @@ export const ContactInfo: React.FC<ContactInfoProps> = ({ publicProfile }) => {
               <Text strong>Langues parlées:</Text>
               <br />
               <div style={{ marginTop: 4 }}>
-                {publicProfile.fliiinker_profile.spoken_languages.map((lang, index) => (
+                {publicProfile.fliiinker_profile.spoken_languages.map((lang: any, index: number) => (
                   <Tag key={index} color="blue">
                     {typeof lang === "object" ? (lang as any).name || "Langue" : lang}
                   </Tag>

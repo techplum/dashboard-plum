@@ -202,7 +202,15 @@ const PaymentProfileModal: React.FC<PaymentProfileModalProps> = ({
       meeting: undefined,
 
       // Données administratives vides
-      administrative_images: [],
+      administrative_images: {
+        fliiinker_id: undefined,
+        created_at: undefined,
+        front_image: undefined,
+        back_image: undefined,
+        passport_image: undefined,
+        has_passport: false,
+        has_cin: false,
+      },
     };
   };
 

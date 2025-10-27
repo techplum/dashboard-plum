@@ -58,7 +58,7 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ services, fliiin
     try {
       await updateService({
         resource: "fliiinker_service_mtm",
-        id: { service_id: serviceId, fliiinker_id: fliiinkerId },
+        id: `${serviceId}-${fliiinkerId}`,
         values: {
           description: tempDescription,
           hourly_rate: tempHourlyRate,
