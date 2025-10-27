@@ -1,5 +1,6 @@
 // Proxy pour les images administratives - compatible avec le proxy local
 export default async function handler(req, res) {
+  const base_url = process.env.VITE_API_BASE_URL;
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,7 +13,7 @@ export default async function handler(req, res) {
 
   try {
     // Utiliser la même URL que le proxy local
-    const apiUrl = `https://staging.api.plumservices.co/access-administrative-image/signed-url`;
+    const apiUrl = `${base_url}/access-administrative-image/signed-url`;
     const params = new URLSearchParams({
       imagePath: imagePath,
       expirationInSeconds: expirationInSeconds
@@ -24,8 +25,18 @@ export default async function handler(req, res) {
       'access-administrative-image': process.env.VITE_ACCESS_ADMINISTRATIVE_IMAGE_SECRET_KEY,
     };
 
+    // Ajouter le token JWT si présent dans la requête
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+      console.log('🔑 Token JWT ajouté:', authHeader.substring(0, 50) + '...');
+    } else {
+      console.log('⚠️ Pas de token JWT dans la requête');
+    }
+
     console.log('🔄 Proxy Vercel - Appel API:', `${apiUrl}?${params}`);
-    console.log('🔑 Token présent:', !!process.env.VITE_ACCESS_ADMINISTRATIVE_IMAGE_SECRET_KEY);
+    console.log('🔑 Token admin présent:', !!process.env.VITE_ACCESS_ADMINISTRATIVE_IMAGE_SECRET_KEY);
+    console.log('🔑 Headers envoyés:', Object.keys(headers));
 
     const response = await fetch(`${apiUrl}?${params}`, {
       method: 'GET',
