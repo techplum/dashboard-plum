@@ -59,17 +59,13 @@ import RealtimeTest from "./components/RealtimeTest";
 import "antd/dist/reset.css";
 import { App as AntApp } from "antd";
 
-// Register service worker for caching
+// Désactiver complètement le service worker
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((registration) => {
-        console.log("SW registered: ", registration);
-      })
-      .catch((registrationError) => {
-        console.log("SW registration failed: ", registrationError);
-      });
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
+      console.log("Désactivation du service worker:", registration);
+      registration.unregister();
+    });
   });
 }
 
@@ -262,14 +258,14 @@ const AppContent: React.FC = () => {
             icon: <CreditCardOutlined />,
           },
         },
-        {
-          name: "claim",
-          list: "/claim",
-          meta: {
-            label: "Réclamations",
-            icon: <SolutionOutlined />,
-          },
-        },
+        // {
+        //   name: "claim",
+        //   list: "/claim",
+        //   meta: {
+        //     label: "Réclamations",
+        //     icon: <SolutionOutlined />,
+        //   },
+        // },
         {
           name: "claim-management",
           list: "/claim-management",

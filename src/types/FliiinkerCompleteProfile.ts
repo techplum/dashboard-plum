@@ -110,7 +110,10 @@ export interface FliiinkerCompleteProfile {
     created_at?: string;
     front_image?: string;
     back_image?: string;
-  }[];
+    passport_image?: string;
+    has_passport?: boolean;
+    has_cin?: boolean;
+  };
 
   addresses?: Address[];
 

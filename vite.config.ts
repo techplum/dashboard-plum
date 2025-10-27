@@ -20,6 +20,21 @@ export default defineConfig({
     port: 5173,
     watch: {
       usePolling: true,
+    },
+    proxy: {
+      '/api/admin-images': {
+        target: 'https://staging.api.plumservices.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/admin-images/, '/access-administrative-image'),
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('🔄 Proxy request:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('📡 Proxy response:', proxyRes.statusCode, req.url);
+          });
+        }
+      }
     }
   },
   build: {

@@ -45,14 +45,210 @@ import dayjs from "dayjs";
 import { ColorModeContext } from "../../contexts/color-mode";
 import { FliiinkerCompleteProfile } from "../../types/FliiinkerCompleteProfile";
 import type { Address } from "../../types/FliiinkerCompleteProfile";
+import { supabaseClient } from "../../utility/supabaseClient";
 import "../../styles/meetingModal.css";
 
 const { Title, Text, Paragraph } = Typography;
-const worker_url_secure_access = import.meta.env.VITE_URL_WORKER_SECURE_ACCESS;
-const front_image = import.meta.env.VITE_ADMIN_DATA_IMAGES_FRONT_IMAGE;
-const back_image = import.meta.env.VITE_ADMIN_DATA_IMAGES_BACK_IMAGE;
+const base_url = "https://staging.api.plumservices.co";
 
-// Composant d'image administrative - Version simple qui fonctionne
+// Cache pour éviter les appels multiples
+const imageUrlCache = new Map<string, Promise<string>>();
+
+// Fonction pour récupérer le token JWT de l'utilisateur connecté
+const getUserToken = async (): Promise<string | null> => {
+  try {
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      console.error("Erreur récupération session:", error);
+      return null;
+    }
+    
+    if (!session) {
+      console.warn("⚠️ Pas de session active");
+      return null;
+    }
+    
+    const token = session.access_token;
+    if (token) {
+      // Décoder le token pour vérifier sa validité
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const exp = payload.exp * 1000; // Convertir en millisecondes
+        const now = Date.now();
+        
+        console.log("🔍 Analyse du token JWT:");
+        console.log("   Expiration:", new Date(exp).toISOString());
+        console.log("   Maintenant:", new Date(now).toISOString());
+        console.log("   Valide:", exp > now ? "✅ Oui" : "❌ Expiré");
+        console.log("   User ID:", payload.sub);
+        console.log("   Email:", payload.email);
+        
+        if (exp <= now) {
+          console.warn("⚠️ Token JWT expiré, tentative de refresh...");
+          
+          const { data: refreshData, error: refreshError } = await supabaseClient.auth.refreshSession();
+          if (refreshError) {
+            console.error("❌ Échec du refresh:", refreshError);
+            return null;
+          }
+          
+          if (refreshData.session?.access_token) {
+            console.log("✅ Token refreshé avec succès");
+            return refreshData.session.access_token;
+          }
+        }
+      } catch (decodeError) {
+        console.error("❌ Erreur décodage token:", decodeError);
+      }
+    }
+    
+    return token;
+  } catch (error) {
+    console.error("Erreur getUserToken:", error);
+    return null;
+  }
+};
+
+// Fonction pour tester l'appel API via le proxy Vite (avec cache pour éviter les appels multiples)
+const getSignedImageUrl = async (imagePath: string): Promise<string> => {
+  // Vérifier le cache d'abord
+  if (imageUrlCache.has(imagePath)) {
+    console.log("🔄 Utilisation du cache pour:", imagePath);
+    return imageUrlCache.get(imagePath)!;
+  }
+
+  // Créer la promesse et la mettre en cache immédiatement
+  const promise = fetchSignedImageUrl(imagePath);
+  imageUrlCache.set(imagePath, promise);
+  
+  return promise;
+};
+
+// Fonction interne pour faire l'appel API
+const fetchSignedImageUrl = async (imagePath: string): Promise<string> => {
+  // Utiliser le proxy local au lieu d'appeler directement le backend
+  const proxyUrl = `/api/admin-images/signed-url`;
+  const params = new URLSearchParams({
+    imagePath: imagePath,
+    expirationInSeconds: '60'
+  });
+  
+  console.log("🔍 APPEL API VIA PROXY:");
+  console.log("   Proxy URL:", `${proxyUrl}?${params}`);
+  console.log("   imagePath:", imagePath);
+  
+  try {
+    // Récupérer le token JWT de l'utilisateur connecté
+    const userToken = await getUserToken();
+    console.log("   JWT Token:", userToken ? "✅ Récupéré" : "❌ Non trouvé");
+    
+    // Utiliser le token qui fonctionne
+    const workingToken = import.meta.env.VITE_ACCESS_ADMINISTRATIVE_IMAGE_SECRET_KEY;
+    
+    const headers: Record<string, string> = {
+      'accept': '*/*',
+      'access-administrative-image': workingToken, // Utiliser directement le token qui fonctionne
+    };
+    
+    // Ajouter le token JWT si disponible
+    if (userToken) {
+      headers['Authorization'] = `Bearer ${userToken}`;
+    } else {
+      console.warn("⚠️ Pas de token JWT - l'authentification pourrait échouer");
+    }
+    
+    console.log("   Headers envoyés:", Object.keys(headers));
+    
+    // Appel via le proxy (pas de problème CORS)
+    const response = await fetch(`${proxyUrl}?${params}`, {
+      method: 'GET',
+      headers: headers,
+    });
+
+    console.log("📡 RÉPONSE VIA PROXY:");
+    console.log("   Status:", response.status);
+    console.log("   OK:", response.ok);
+    console.log("   Headers:", Object.fromEntries(response.headers.entries()));
+
+    const responseText = await response.text();
+    console.log("📋 DONNÉES BRUTES:", responseText);
+
+    if (response.ok) {
+      try {
+        const jsonData = JSON.parse(responseText);
+        console.log("📋 DONNÉES JSON:", jsonData);
+        
+        // La réponse a le format: { success: true, data: { signedUrl: "..." } }
+        const signedUrl = jsonData.data?.signedUrl || jsonData.signedUrl || jsonData.url;
+        
+        if (signedUrl) {
+          console.log("✅ URL signée obtenue avec succès:", signedUrl.substring(0, 100) + "...");
+          return signedUrl;
+        } else {
+          console.log("❌ Pas d'URL signée dans la réponse");
+          return "URL_FACTICE";
+        }
+      } catch {
+        console.log("📋 Pas du JSON, retour brut:", responseText);
+        return "URL_FACTICE";
+      }
+    } else {
+      console.log("❌ ERREUR API:", response.status, responseText);
+      
+      // Si c'est une erreur d'authentification, essayer avec le token hardcodé
+      if (response.status === 401 || response.status === 403) {
+        console.log("🚨 ERREUR D'AUTHENTIFICATION - Tentative avec token hardcodé:");
+        
+        try {
+          const fallbackHeaders = {
+            'accept': '*/*',
+            'access-administrative-image': workingToken, // Token qui marche dans curl
+            ...(userToken ? { 'Authorization': `Bearer ${userToken}` } : {}),
+          };
+          
+          console.log("   🔄 Retry avec token hardcodé...");
+          
+          const retryResponse = await fetch(`${proxyUrl}?${params}`, {
+            method: 'GET',
+            headers: fallbackHeaders,
+          });
+          
+          console.log("   📡 Retry Status:", retryResponse.status);
+          
+          if (retryResponse.ok) {
+            const retryText = await retryResponse.text();
+            console.log("   ✅ SUCCESS avec token hardcodé!");
+            console.log("   📋 Données:", retryText);
+            
+            try {
+              const jsonData = JSON.parse(retryText);
+              const signedUrl = jsonData.data?.signedUrl || jsonData.signedUrl || jsonData.url;
+              return signedUrl || "URL_FACTICE";
+            } catch {
+              return "URL_FACTICE";
+            }
+          } else {
+            console.log("   ❌ Retry aussi échoué:", retryResponse.status);
+          }
+        } catch (retryError) {
+          console.log("   ❌ Erreur retry:", retryError);
+        }
+      }
+      
+      return "URL_FACTICE";
+    }
+
+  } catch (error) {
+    console.error("❌ ERREUR FETCH VIA PROXY:", error);
+    
+    // Supprimer du cache en cas d'erreur
+    imageUrlCache.delete(imagePath);
+    
+    return "URL_FACTICE";
+  }
+};
+
+// Composant d'image administrative utilisant la nouvelle API signed-url
 const AdminImage: React.FC<{
   imagePath: string | undefined;
   alt: string;
@@ -70,45 +266,28 @@ const AdminImage: React.FC<{
       return;
     }
 
-    const fetchImage = async () => {
+    const fetchSignedUrl = async () => {
       try {
         setLoading(true);
-        const fullUrl = `${worker_url_secure_access}/${imagePath}`;
-        console.log("🔍 URL complète:", fullUrl);
+        setError(false);
+        
         console.log("🔍 Token:", import.meta.env.VITE_ADMIN_DATA_IMAGES_SECRET_KEY ? "✅ Défini" : "❌ Non défini");
         
-        // Exactement comme dans Postman
-        const response = await fetch(fullUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_ADMIN_DATA_IMAGES_SECRET_KEY}`,
-          },
-        });
-
-        console.log("📡 Response status:", response.status);
-        console.log("📡 Response headers:", [...response.headers.entries()]);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        setImageUrl(objectUrl);
+        const signedUrl = await getSignedImageUrl(imagePath);
+        setImageUrl(signedUrl);
         setLoading(false);
-        console.log("✅ Image chargée avec succès");
 
       } catch (err) {
-        console.error(`❌ Erreur de chargement:`, err);
+        console.error(`❌ Erreur de chargement de l'image administrative:`, err);
         setError(true);
         setLoading(false);
       }
     };
 
-    fetchImage();
+    fetchSignedUrl();
 
     return () => {
-      if (imageUrl) {
+      if (imageUrl && imageUrl.startsWith('blob:')) {
         URL.revokeObjectURL(imageUrl);
       }
     };
@@ -411,33 +590,27 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   };
 
   // Fonction pour afficher l'image administrative dans la modale
-  const handleAdminImageClick = (imagePath: string) => {
+  const handleAdminImageClick = async (imagePath: string) => {
     if (!imagePath) return;
 
-    // Charger l'image avec l'autorisation et l'afficher
-    fetch(
-      `https://administrative-image-access.fliiinkapp.workers.dev/${imagePath}`,
-      {
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_ADMIN_DATA_IMAGES_SECRET_KEY}`,
-        },
-      },
-    )
-      .then((response) => {
-        if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
-        return response.blob();
-      })
-      .then((blob) => {
-        const objectUrl = URL.createObjectURL(blob);
-        setSelectedImage(objectUrl);
-      })
-      .catch((error) => {
-        console.error(
-          `Erreur lors du chargement de l'image administrative: ${imagePath}`,
-          error,
-        );
-        messageApi.error(`Impossible de charger l'image: ${error.message}`);
-      });
+    try {
+      console.log("🔍 Récupération URL signée pour agrandissement:", imagePath);
+      const signedUrl = await getSignedImageUrl(imagePath);
+      
+      if (signedUrl && signedUrl !== "URL_FACTICE") {
+        console.log("✅ Ouverture de l'image en grand");
+        setSelectedImage(signedUrl);
+      } else {
+        console.warn("⚠️ URL signée non valide");
+        messageApi.warning("Impossible d'afficher l'image en grand");
+      }
+    } catch (error) {
+      console.error(
+        `Erreur lors du chargement de l'image administrative pour modale: ${imagePath}`,
+        error,
+      );
+      messageApi.error(`Impossible de charger l'image: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    }
   };
 
   if (loading) {
@@ -519,23 +692,50 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
         onCancel={() => {
           handleCloseImageModal();
           // Si c'est une URL d'objet blob, la révoquer pour libérer la mémoire
-          if (selectedImage && !selectedImage.startsWith("http")) {
+          if (selectedImage && selectedImage.startsWith("blob:")) {
             URL.revokeObjectURL(selectedImage);
           }
         }}
         footer={null}
         centered
+        width="90vw"
+        style={{ top: 20 }}
+        title={
+          <div style={{ textAlign: "center" }}>
+            <Title level={4} style={{ margin: 0, color: "#1890ff" }}>
+              <IdcardOutlined style={{ marginRight: 8 }} />
+              Document d'identité
+            </Title>
+          </div>
+        }
       >
         {selectedImage && (
-          <img
-            src={selectedImage}
-            alt="Image agrandie"
-            style={{ width: "100%", maxHeight: "80vh", objectFit: "contain" }}
-            onError={() => {
-              console.error("Erreur de chargement de l'image:", selectedImage);
-              handleCloseImageModal();
-            }}
-          />
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <img
+              src={selectedImage}
+              alt="Document d'identité agrandi"
+              style={{ 
+                maxWidth: "100%", 
+                maxHeight: "75vh", 
+                objectFit: "contain",
+                borderRadius: "8px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+              }}
+              onError={() => {
+                console.error("Erreur de chargement de l'image:", selectedImage);
+                messageApi.error("Impossible d'afficher l'image");
+                handleCloseImageModal();
+              }}
+              onLoad={() => {
+                console.log("✅ Image chargée avec succès dans la modale");
+              }}
+            />
+            <div style={{ marginTop: 16, color: "#666" }}>
+              <Text type="secondary">
+                Cliquez en dehors de l'image ou appuyez sur Échap pour fermer
+              </Text>
+            </div>
+          </div>
         )}
       </Modal>
 
@@ -820,150 +1020,163 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
         </>
       )}
 
-      {/* Section pour les photos de carte d'identité/passeport */}
+      {/* Section pour les pièces d'identité / passeport */}
       {(() => {
-        // Exemple de chemin : 009eb577-fd92-430a-a86d-3477f090563f/back_image-1749444367347.png
-        // Tu devras remplacer ces chemins par les vrais chemins depuis profileData
-        const identityImages = {
-          frontImage: front_image,
-          backImage: back_image,
+        // Récupérer les images depuis les données administratives
+        const adminImages = profileData.administrative_images;
+        
+        console.log("🔍🔍🔍 Vérification des images administratives pour l'identité:", {
+          hasAdminImages: !!adminImages,
+          adminImagesType: typeof adminImages,
+          adminImages: adminImages,
+        });
+
+        if (!adminImages) {
+          return null;
+        }
+
+        const { has_cin, has_passport, front_image, back_image, passport_image } = adminImages;
+        
+        // Calculer combien d'images on va afficher
+        const imagesToShow = [];
+        
+        if (has_cin && front_image) {
+          imagesToShow.push({
+            key: 'front',
+            title: 'Carte d\'identité (Recto)',
+            imagePath: front_image,
+            alt: 'Carte d\'identité - Recto'
+          });
+        }
+        
+        if (has_cin && back_image) {
+          imagesToShow.push({
+            key: 'back', 
+            title: 'Carte d\'identité (Verso)',
+            imagePath: back_image,
+            alt: 'Carte d\'identité - Verso'
+          });
+        }
+        
+        if (has_passport && passport_image) {
+          imagesToShow.push({
+            key: 'passport',
+            title: 'Passeport',
+            imagePath: passport_image,
+            alt: 'Passeport'
+          });
+        }
+
+        if (imagesToShow.length === 0) {
+          return null;
+        }
+
+        // Calculer la largeur des colonnes selon le nombre d'images
+        const getColSpan = (totalImages: number) => {
+          if (totalImages === 1) return 24; // Une image = pleine largeur
+          if (totalImages === 2) return 12; // Deux images = 50% chacune
+          return 8; // Trois images = 33% chacune
         };
 
+        const colSpan = getColSpan(imagesToShow.length);
+
         return (
-          (identityImages.frontImage || identityImages.backImage) && (
-            <>
-              <Divider style={{ margin: "16px 0" }} />
-              <Title level={5}>
-                <IdcardOutlined style={{ marginRight: 8, color: "#1890ff" }} />
-                Pièces d'identité / Passeport
-              </Title>
-              <Row gutter={[16, 16]}>
-                {identityImages.frontImage && (
-                  <Col span={12}>
-                    <Card
-                      title="Recto"
-                      className="admin-image-card"
-                      style={{ height: "100%" }}
+          <>
+            <Divider style={{ margin: "16px 0" }} />
+            <Title level={5}>
+              <IdcardOutlined style={{ marginRight: 8, color: "#1890ff" }} />
+              Pièces d'identité / Passeport
+              <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+                ({imagesToShow.length} document{imagesToShow.length > 1 ? 's' : ''})
+              </Text>
+            </Title>
+            <Row gutter={[16, 16]} justify="start">
+              {imagesToShow.map((imageInfo) => (
+                <Col span={colSpan} key={imageInfo.key}>
+                  <Card
+                    title={imageInfo.title}
+                    className="admin-image-card"
+                    style={{ height: "100%" }}
+                    hoverable
+                  >
+                    <div
+                      style={{
+                        position: "relative",
+                        overflow: "hidden",
+                        borderRadius: 8,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.querySelector('img')!.style.transform = "scale(1.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.querySelector('img')!.style.transform = "scale(1)";
+                      }}
                     >
                       <AdminImage
-                        imagePath={identityImages.frontImage}
-                        alt="Carte d'identité/Passeport - Recto"
+                        imagePath={imageInfo.imagePath}
+                        alt={imageInfo.alt}
                         style={{
                           width: "100%",
                           height: 200,
                           objectFit: "cover",
                           borderRadius: 8,
                           cursor: "pointer",
+                          transition: "transform 0.3s ease",
+                          display: "block",
                         }}
-                        onClick={() =>
-                          handleAdminImageClick(identityImages.frontImage || "")
-                        }
+                        onClick={() => handleAdminImageClick(imageInfo.imagePath)}
                       />
-                    </Card>
-                  </Col>
-                )}
-                {identityImages.backImage && (
-                  <Col span={12}>
-                    <Card
-                      title="Verso"
-                      className="admin-image-card"
-                      style={{ height: "100%" }}
-                    >
-                      <AdminImage
-                        imagePath={identityImages.backImage}
-                        alt="Carte d'identité/Passeport - Verso"
+                      {/* Overlay pour indiquer qu'on peut cliquer */}
+                      <div
                         style={{
-                          width: "100%",
-                          height: 200,
-                          objectFit: "cover",
-                          borderRadius: 8,
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: "rgba(0,0,0,0)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          opacity: 0,
+                          transition: "opacity 0.3s ease",
                           cursor: "pointer",
+                          borderRadius: 8,
                         }}
-                        onClick={() =>
-                          handleAdminImageClick(identityImages.backImage || "")
-                        }
-                      />
-                    </Card>
-                  </Col>
-                )}
-              </Row>
-            </>
-          )
+                        className="image-overlay"
+                        onClick={() => handleAdminImageClick(imageInfo.imagePath)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = "1";
+                          e.currentTarget.style.background = "rgba(0,0,0,0.3)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = "0";
+                          e.currentTarget.style.background = "rgba(0,0,0,0)";
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: "rgba(255,255,255,0.9)",
+                            padding: "8px 16px",
+                            borderRadius: "20px",
+                            color: "#1890ff",
+                            fontWeight: "bold",
+                            fontSize: "14px",
+                          }}
+                        >
+                          🔍 Cliquer pour agrandir
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </>
         );
       })()}
 
-      {/* Affichage des images administratives */}
-      {(() => {
-        console.log("🔍🔍🔍 Vérification des images administratives:", {
-          hasProfileData: !!profileData,
-          hasAdminImages: !!profileData?.administrative_images,
-          adminImagesLength: profileData?.administrative_images?.length || 0,
-          adminImages: profileData?.administrative_images,
-        });
-        return (
-          profileData.administrative_images &&
-          profileData.administrative_images.length > 0 && (
-            <>
-              <Divider style={{ margin: "16px 0" }} />
-              <Title level={5}>Documents administratifs</Title>
-              <Row gutter={[16, 16]}>
-                {profileData.administrative_images.map((adminImage, index) => (
-                  <React.Fragment key={index}>
-                    {adminImage.front_image && (
-                      <Col span={12}>
-                        <Card
-                          title="Pièce d'identité (Recto)"
-                          className="admin-image-card"
-                        >
-                          <AdminImage
-                            imagePath={adminImage.front_image}
-                            alt="Pièce d'identité recto"
-                            style={{
-                              width: "100%",
-                              height: 200,
-                              objectFit: "cover",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                            }}
-                            onClick={() =>
-                              handleAdminImageClick(
-                                adminImage.front_image || "",
-                              )
-                            }
-                          />
-                        </Card>
-                      </Col>
-                    )}
-                    {adminImage.back_image && (
-                      <Col span={12}>
-                        <Card
-                          title="Pièce d'identité (Verso)"
-                          className="admin-image-card"
-                        >
-                          <AdminImage
-                            imagePath={adminImage.back_image}
-                            alt="Pièce d'identité verso"
-                            style={{
-                              width: "100%",
-                              height: 200,
-                              objectFit: "cover",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                            }}
-                            onClick={() =>
-                              handleAdminImageClick(adminImage.back_image || "")
-                            }
-                          />
-                        </Card>
-                      </Col>
-                    )}
-                  </React.Fragment>
-                ))}
-              </Row>
-            </>
-          )
-        );
-      })()}
+      {/* Cette section est maintenant fusionnée avec la section des pièces d'identité ci-dessus */}
 
       {services && services.length > 0 && (
         <>
